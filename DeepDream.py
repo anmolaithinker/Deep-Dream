@@ -209,6 +209,28 @@ def Plot_Gradient(gradient):
 # For Resizing One image 
 # Arguments -> Size -> You can specify size of final Image
 # 			-> Factor -> You can specify the factor of how much to scale the Image in height and width
+
+'''
+Steps to perform resize the image according to size or factor
+
+-> Lets take according to the factor first
+-----> Scale the size of image by factor given 
+-----> Convert the result of above into int (PIL)
+-----> Perform numpy clipping
+-----> convert into bytes
+-----> getting numpy array from PIL.Image
+-----> Perform Resize operation ( Note LANCZOS === ANTIALIAS)
+-----> Convert into float
+-----> return 
+
+-> Lets take according to the size first
+-----> Perform numpy clipping
+-----> convert into bytes
+-----> getting numpy array from PIL.Image
+-----> Perform Resize operation ( Note LANCZOS === ANTIALIAS)
+-----> Convert into float
+-----> return 
+'''
 def resize_image(image , size = None , factor = None):
 
 	if factor is not None:
@@ -270,6 +292,25 @@ def get_tiles_size(num_pixels , tile_size = 400):
 	actual_tile_size = math.ceil(num_pixels / num_tiles)
 
 	return actual_tile_size
+
+############################################################################################################
+
+'''
+
+Steps to follow in this function:
+
+-----> Initialize the grad variable with all zeroes value having same shape of image
+-----> Getting the tile size (x and y axis) with get_tile_size function 
+-----> get starting of x tile 
+-----> get starting of y tile
+-----> x end = x start + x tile size
+-----> y end = y start + y tile size
+-----> Get image tile given ( xstart , xend ) and ( ystart , yend )
+-----> Calculate the gradient with tensorflow
+-----> Normalize the gradient
+-----> set grad (xstart , xend) and (ystart , yend) = g
+-----> return grad
+'''
 
 # Calculate the gradient on titles 
 def tiled_gradient(gradient , image , tile_size = 400):
@@ -351,6 +392,18 @@ The gradient is then added to the input image so the mean value of the layer-ten
 This process is repeated a number of times and amplifies whatever patterns the Inception model sees in the input image.
 '''	
 
+'''
+Steps that will be performed in this function
+
+-----> Call get gradient function to get the gradients to the corresponding layer tensor
+-----> Iterate till the number of iterations given
+-----> We are inside the loop
+-----> Call tiled_gradient function and get grad (image of gradient of input image)
+-----> smooth and normalize the gradients
+-----> add the gradient into image
+-----> return image 
+'''
+
 def OptimizeImageFunc(layer_tensor , image , num_iterations = 10 , step_size = 0.3 , tile_size = 400 , show_gradient = False):
 
 	'''
@@ -418,6 +471,126 @@ def OptimizeImageFunc(layer_tensor , image , num_iterations = 10 , step_size = 0
 
     # Return image
     return img
+
+########################################################################################################
+
+'''
+Recursive Image Optimization
+The Inception model was trained on fairly small images.
+The exact size is unclear but maybe 200-300 pixels in each dimension. 
+If we use larger images such as 1920x1080 pixels then the optimize_image() function above will add many small patterns to the image.
+This helper-function downscales the input image several times and runs each downscaled version through the optimize_image() function above. This results in larger patterns in the final image. It also speeds up the computation.
+'''    
+
+'''
+Arguments
+
+1. Layer_Tensor
+2. image
+3. num_repeats = 4
+4. rescale factor = 0.7
+5. ?? blend = 0.2	
+6.	num_iterations = 10
+7. step size = 3.0
+8. tile_size = 400
+'''
+
+'''
+Steps to follow recursive optimization
+-> Base condition
+-> Blur the image
+-> Downscale the image
+-> Apply Recursion ( num_repeats = num_repeats - 1 , image = img_down )
+-> (BackTracking) -> Upsampling and blending
+-> End Loop
+-> Call Optimized loop and save into image result
+-> return image result
+
+'''
+def Recusrive_Optimization(layer_tensor , image , num_repeats = 4 , rescale_factor = 0.7 , blend = 0.2 , num_iterations = 10 , step_size = 3.0 , tile_size = 400):
+
+	# Base condition to stop recursive is num_repeats > 0
+	if num_repeats > 0:
+		# Blur the input image to prevent artifacts when downscaling... <--
+		# For blur the input image we will set the value of sigma
+		# We are using gaussian filter
+		sigma  = 0.5
+		blur_image = gaussian_filter(image , sigma = (sigma,sigma,0.0))
+
+		# Downscale the image
+		img_down = resize_image(image = blur_image , factor = rescale_factor)
+
+		# Make Recursive call
+		# num_repeats = num_repeats - 1
+		# Use img_down
+
+		img_result = Recusrive_Optimization(layer_tensor = layer_tensor ,
+											image = img_down ,
+											num_repeats = num_repeats-1 , 
+											rescale_factor = rescale_factor, 
+											blend = blend, 
+											num_iterations = num_iterations, 
+											step_size = step_size, 
+											tile_size = tile_size)
+
+
+		# Now do upsampling
+		img_up = resize_image(image = img_result , size = image.shape)
+
+		# Blend(Mix two images)
+		# image_Upsampled and true image
+
+		image = blend * image + (1.0 - blend) * img_up 
+
+	print ("Recursive Level : " , num_repeats)
+	
+	# Apply the function to merge image with gradients 
+	img_result = optimize_image(layer_tensor = layer_tensor ,
+								 image = image , 
+								 num_iterations = num_iterations , 
+								 step_size = step_size , 
+								 tile_size = tile_size)
+
+	return img_result
+
+
+############################################################################################################
+
+def Main(image_path , layer_tensor_num , recursive = False):
+
+	if image_path == '' or layer_tensor_num == '' or layer_tensor_num < 0:
+		print ('Error!!!!!!')
+	
+	else:
+		# To Execute the graph we need tensorflow session . 
+		# We are using interactive session
+		session = tf.InteractiveSession(graph = model.graph)
+		
+		#Load image
+		image = Load_Image(image_path)
+
+		# Plot Images
+		plot_image(image)
+
+		# Taking layer tensor whose gradient has to be maximized
+		layer_tensor = model.layer_tensors[layer_tensor_num]
+		print ("Taking Layer Tensor " : str(layer_tensor))
+
+		if recursive:
+			img_result = recursive_optimize(layer_tensor=layer_tensor, image=image,
+                 num_iterations=10, step_size=3.0, rescale_factor=0.7,
+                 num_repeats=4, blend=0.2)
+			
+		else:
+			img_result = optimize_image(layer_tensor, image,
+                   num_iterations=10, step_size=6.0, tile_size=400,
+                   show_gradient=True)	
+
+
+
+
+
+
 
 
 
