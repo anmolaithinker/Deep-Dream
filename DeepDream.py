@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 import random
 import math
-from PIL import Image
+import PIL.Image
 import os
 from scipy.ndimage.filters import gaussian_filter
 
@@ -26,21 +26,20 @@ def PrintDownloadProgress(count , block_size , total_size):
   sys.stdout.flush()
 
 
-
 ########################################################################################################
 
-def downloadInception5H(data_dir , path_graph_def):
+def downloadInception5H(data_dir):
   data_url = "http://storage.googleapis.com/download.tensorflow.org/models/inception5h.zip"
   data_dir = data_dir
   file_name = data_url.split('/')[-1]
   file_path = os.path.join(data_dir , file_name)
+  print ("File is downloading in  : " + str(file_path))
   if not os.path.exists(file_path):
     if not os.path.exists(data_dir):
       os.create(data_dir)
   
    # Retrieving data from file
-    file_path , _ = urllib2.urlopen(url = data_url , )
-    urllib.urlretrieve(url = data_url , filename = filepath , reporthook = PrintDownloadProgress)
+    file_path , _  = urllib.request.urlretrieve(url = data_url , filename = file_path , reporthook = PrintDownloadProgress)
   
     print ()
     print (" Downloading finished !! Now Extracting the files ......")
@@ -67,83 +66,80 @@ def downloadInception5H(data_dir , path_graph_def):
 
 ########################################################################################################
 
-class inception5h:
-  	
-  	path_graph_def = "tensorflow_inception_graph.pb"
+path_graph_def = "tensorflow_inception_graph.pb"
 
   	# Commonly used layers in inception
 
-    layer_names = ['conv2d0', 'conv2d1', 'conv2d2',
-                   'mixed3a', 'mixed3b',
-                   'mixed4a', 'mixed4b', 'mixed4c', 'mixed4d', 'mixed4e',
-                   'mixed5a', 'mixed5b']
+layer_names = ['conv2d0', 'conv2d1', 'conv2d2','mixed3a', 'mixed3b','mixed4a', 'mixed4b', 'mixed4c', 'mixed4d', 'mixed4e','mixed5a', 'mixed5b']
 
 
-    tensor_name_input_image = 'input:0'               
+tensor_name_input_image = 'input:0'               
 
-	def __init__(self,data_dir):
+class inception5h:
+  	
+  def __init__(self,data_dir):
 
 		# New Tensorflow Computational Graph
-		self.graph = tf.Graph()
+	  self.graph = tf.Graph()
 
 		# Making graph as default graph
-		with self.graph.as_default():
-			path = os.path.join(data_dir , path_graph_def)
-			with tf.gfile.FastGFile(path , 'rb') as file:
+	  with self.graph.as_default():
+		  path = os.path.join(data_dir , path_graph_def)
+		  with tf.gfile.FastGFile(path , 'rb') as file:
 
 				# Saved Copy of Tensorflow graph
-				graph_def = tf.GraphDef()
+			  graph_def = tf.GraphDef()
 
 				# Load the protobuff file in graph_def
-				graph_def.ParseFromString(file.read())
+			  graph_def.ParseFromString(file.read())
 
 				# Finally Import the graph-def to the default Tensorflow graph
-				tf.import_graph_def(graph_def , name = '')
+			  tf.import_graph_def(graph_def , name = '')
 
 				# Now self.graph holds the Inception Model 	from Proto-Buf file
 
 			
 			# Getting refrence for input
-			self.input = self.graph.get_tensor_by_name('input:0')
+		  self.input = self.graph.get_tensor_by_name('input:0')
 
 			# Getting refrence for Layer Tensors
-			self.layer_tensors = [self.graph.get_tensor_by_name(name + ':0') for names in layer_names]
+		  self.layer_tensors = [self.graph.get_tensor_by_name(names + ':0') for names in layer_names]
 
 
 	# Method providing for feed dict used while training		
-	def create_feed_dict(self,image = None):
+  def create_feed_dict(self,image = None):
 
 		# Because there is only a single image so we have to expand the image as inception will take the input with batch size
-		image = np.expand_dims(image , axis = 0)
+	  image = np.expand_dims(image , axis = 0)
 		
 		# Making of feed dict
-		feed_dict = {self.tensor_name_input_image : image}
-		return feed_dict
+	  feed_dict = {tensor_name_input_image : image}
+	  return feed_dict
 
 
 	# Gradients
-	def get_Gradients(self , tensor):
+  def get_Gradients(self , tensor):
 
 		# making the current graph as default graph
-		with self.graph.as_default():
+	  with self.graph.as_default():
 
 			# Square the tensor values
-			tensor = tf.square(tensor)
+		  tensor = tf.square(tensor)
 
 			# Calculate the mean
-			tensor_mean = tf.reduce_mean(tensor)
+		  tensor_mean = tf.reduce_mean(tensor)
 
-			gradient = tf.gradients(tensor_mean , self.input)[0]
+		  gradient = tf.gradients(tensor_mean , self.input)[0]
 
 
-		return gradient	
+	  return gradient	
 
 
 ########################################################################################################
 
 # Load Images in type float
 def Load_Image(filename):
-	image = Image.open(filename)
+	image = PIL.Image.open(filename)
 	return np.float32(image)
 
 
@@ -158,7 +154,7 @@ def save_Image(image , file_name):
 
 	# Write the image file in jpeg format
 	with open(file_name , 'wb') as file:
-		Image.fromarray(image).save(file , 'jpeg')
+		PIL.Image.fromarray(image).save(file , 'jpeg')
 
 
 ########################################################################################################
@@ -177,8 +173,7 @@ def plot_image(image):
 	image = image.astype(np.uint8)
 
 	# Show Image
-	display(Image.fromarray(image))
-
+	display(PIL.Image.fromarray(image))
 
 
 ########################################################################################################
@@ -189,7 +184,6 @@ def Normalization(x):
 	# Applying Norm. Formula
 	xnorm = (x - x.min()) / (x.max() - x.min())
 	return xnorm
-
 
 
 ########################################################################################################
@@ -256,7 +250,7 @@ def resize_image(image , size = None , factor = None):
 	# Convert into bytes
 	image = image.astype(np.unint8)
 
-	image = Image.fromarray(image)
+	image = PIL.Image.fromarray(image)
 
 	# Resized the image
 	img_resized = image.resize(size , Image.LANCZOS)
@@ -293,6 +287,7 @@ def get_tiles_size(num_pixels , tile_size = 400):
 
 	return actual_tile_size
 
+
 ############################################################################################################
 
 '''
@@ -313,7 +308,8 @@ Steps to follow in this function:
 '''
 
 # Calculate the gradient on titles 
-def tiled_gradient(gradient , image , tile_size = 400):
+# Calculate the gradient on titles 
+def tiled_gradient(gradient , image , tile_size = 400 , model = None , session = None):
 
 	# Allocate an array for gradients for an image
 	grad = np.zeros_like(image)
@@ -380,7 +376,6 @@ def tiled_gradient(gradient , image , tile_size = 400):
 	# Return the new image with gradient 	
 	return grad	
 
-
 ##########################################################################################################
 
 
@@ -404,73 +399,34 @@ Steps that will be performed in this function
 -----> return image 
 '''
 
-def OptimizeImageFunc(layer_tensor , image , num_iterations = 10 , step_size = 0.3 , tile_size = 400 , show_gradient = False):
+def OptimizeImageFunc(layer_tensor , image , num_iterations = 10 , step_size = 0.3 , tile_size = 400 , show_gradient = False , model = None,session = None):
+  
+  img = image.copy()
+  print ('Image Before : ')
+  plot_image(img)
+  print ('Processing Image : ')
+  gradient = model.get_Gradients(layer_tensor)
 
-	'''
-		Layer_Tensor -> Refrence to a tensor that will be maximized
-		image -> input image
-	'''
+  for i in range(num_iterations):
+    grad = tiled_gradient(gradient = gradient , image = img , model = model , session = session)
+    sigma = (i*4.0)/num_iterations + 0.5
+    grad_smooth1 = gaussian_filter(grad , sigma = sigma) 
+    grad_smooth2 = gaussian_filter(grad , sigma = sigma * 0.5)
+    grad_smooth3 = gaussian_filter(grad , sigma = sigma * 2)
+    grad = (grad_smooth1 + grad_smooth2 + grad_smooth3)
+    step_size_scaled = step_size / (np.std(grad) + 1e-8)
+    img += grad * step_size_scaled
+    if show_gradient:
+      Plot_Gradient(grad)
 
-	# make a copy
-	img = image.copy()
-
-
-	# Lets See some images
-	print ('Image Before : ')
-	plot_image(img)
-
-	# Now Lets start some preprocessing
-	print ('Processing Image : ')
-
-	# get Gradient
-	gradient = model.get_gradient(layer_tensor)
-
-	for i in range(num_iterations):
-
-		# Take the grads from tiles_gradient function
-		grad = tiled_gradient(gradient = gradient , image = img)
-
-		# Now we will be making use of gaussian filters
-        # Blur the gradient with different amounts and add
-        # them together. The blur amount is also increased
-        # during the optimization. This was found to give
-        # nice, smooth images. You can try and change the formulas.
-        # The blur-amount is called sigma (0=no blur, 1=low blur, etc.)
-        # We could call gaussian_filter(grad, sigma=(sigma, sigma, 0.0))
-        # which would not blur the colour-channel. This tends to
-        # give psychadelic / pastel colours in the resulting images.
-        # When the colour-channel is also blurred the colours of the
-        # input image are mostly retained in the output image.		
-
-        ###### Note Blur-Amount -> Sigma
-        sigma = (i * 4.0)/num_iterations + 0.5
-
-        # 1. With same sigma  2. with double sigma  3. with half sigma 
-        grad_smooth1 = gaussian_filter(grad , sigma = sigma) 
-        grad_smooth2 = gaussian_filter(grad , sigma = sigma * 0.5)
-        grad_smooth3 = gaussian_filter(grad , sigma = sigma * 2)
-
-        grad = (grad_smooth1 + grad_smooth2 + grad_smooth3)
-
-        # Scaling the step size as we have scaled the gradient
-        step_size_scaled = step_size / (np.std(grad) + 1e-8)
-
-        # Update the image
-        img += grad * step_size_scaled
-
-        # Plot show if show = True
-        if show_gradient:
-        	Plot_Gradient(grad)
+  print ()
+  print ('Image After ::::  ')
+  plot_image(img)
 
 
-    # Plotting the image    	
-    print ()
-    print ('Image After ::::  ')
-    plot_image(img)
+  # Return image
+  return img
 
-
-    # Return image
-    return img
 
 ########################################################################################################
 
@@ -507,51 +463,51 @@ Steps to follow recursive optimization
 -> return image result
 
 '''
-def Recusrive_Optimization(layer_tensor , image , num_repeats = 4 , rescale_factor = 0.7 , blend = 0.2 , num_iterations = 10 , step_size = 3.0 , tile_size = 400):
+# def Recusrive_Optimization(layer_tensor , image , num_repeats = 4 , rescale_factor = 0.7 , blend = 0.2 , num_iterations = 10 , step_size = 3.0 , tile_size = 400):
 
-	# Base condition to stop recursive is num_repeats > 0
-	if num_repeats > 0:
-		# Blur the input image to prevent artifacts when downscaling... <--
-		# For blur the input image we will set the value of sigma
-		# We are using gaussian filter
-		sigma  = 0.5
-		blur_image = gaussian_filter(image , sigma = (sigma,sigma,0.0))
+# 	# Base condition to stop recursive is num_repeats > 0
+# 	if num_repeats > 0:
+# 		# Blur the input image to prevent artifacts when downscaling... <--
+# 		# For blur the input image we will set the value of sigma
+# 		# We are using gaussian filter
+# 		sigma  = 0.5
+# 		blur_image = gaussian_filter(image , sigma = (sigma,sigma,0.0))
 
-		# Downscale the image
-		img_down = resize_image(image = blur_image , factor = rescale_factor)
+# 		# Downscale the image
+# 		img_down = resize_image(image = blur_image , factor = rescale_factor)
 
-		# Make Recursive call
-		# num_repeats = num_repeats - 1
-		# Use img_down
+# 		# Make Recursive call
+# 		# num_repeats = num_repeats - 1
+# 		# Use img_down
 
-		img_result = Recusrive_Optimization(layer_tensor = layer_tensor ,
-											image = img_down ,
-											num_repeats = num_repeats-1 , 
-											rescale_factor = rescale_factor, 
-											blend = blend, 
-											num_iterations = num_iterations, 
-											step_size = step_size, 
-											tile_size = tile_size)
+# 		img_result = Recusrive_Optimization(layer_tensor = layer_tensor ,
+# 											image = img_down ,
+# 											num_repeats = num_repeats-1 , 
+# 											rescale_factor = rescale_factor, 
+# 											blend = blend, 
+# 											num_iterations = num_iterations, 
+# 											step_size = step_size, 
+# 											tile_size = tile_size)
 
 
-		# Now do upsampling
-		img_up = resize_image(image = img_result , size = image.shape)
+# 		# Now do upsampling
+# 		img_up = resize_image(image = img_result , size = image.shape)
 
-		# Blend(Mix two images)
-		# image_Upsampled and true image
+# 		# Blend(Mix two images)
+# 		# image_Upsampled and true image
 
-		image = blend * image + (1.0 - blend) * img_up 
+# 		image = blend * image + (1.0 - blend) * img_up 
 
-	print ("Recursive Level : " , num_repeats)
+# 	print ("Recursive Level : " , num_repeats)
 	
-	# Apply the function to merge image with gradients 
-	img_result = optimize_image(layer_tensor = layer_tensor ,
-								 image = image , 
-								 num_iterations = num_iterations , 
-								 step_size = step_size , 
-								 tile_size = tile_size)
+# 	# Apply the function to merge image with gradients 
+# 	img_result = optimize_image(layer_tensor = layer_tensor ,
+# 								 image = image , 
+# 								 num_iterations = num_iterations , 
+# 								 step_size = step_size , 
+# 								 tile_size = tile_size)
 
-	return img_result
+# 	return img_result
 
 
 ############################################################################################################
@@ -562,6 +518,14 @@ def Main(image_path , layer_tensor_num , recursive = False):
 		print ('Error!!!!!!')
 	
 	else:
+
+		downloadInception5H('./')
+		model = inception5h('./')
+		
+		# 12 should be the output
+		print ("Number of layers in Inception : " + str(len(model.layer_tensors)))
+
+
 		# To Execute the graph we need tensorflow session . 
 		# We are using interactive session
 		session = tf.InteractiveSession(graph = model.graph)
@@ -574,17 +538,17 @@ def Main(image_path , layer_tensor_num , recursive = False):
 
 		# Taking layer tensor whose gradient has to be maximized
 		layer_tensor = model.layer_tensors[layer_tensor_num]
-		print ("Taking Layer Tensor " : str(layer_tensor))
+		print ("Taking Layer Tensor " + str(layer_tensor))
 
 		if recursive:
-			img_result = recursive_optimize(layer_tensor=layer_tensor, image=image,
-                 num_iterations=10, step_size=3.0, rescale_factor=0.7,
-                 num_repeats=4, blend=0.2)
-			
+			print ('Sorry but recursive not yet supported !!!!!!!')
+			# img_result = recursive_optimize(layer_tensor=layer_tensor, image=image,
+   #               num_iterations=10, step_size=3.0, rescale_factor=0.7,
+   #               num_repeats=4, blend=0.2 , model = model)
 		else:
-			img_result = optimize_image(layer_tensor, image,
+			img_result = OptimizeImageFunc(layer_tensor, image,
                    num_iterations=10, step_size=6.0, tile_size=400,
-                   show_gradient=True)	
+                   show_gradient=True , model = model , session = session)	
 
 
 
